@@ -76,6 +76,16 @@ ORDER BY total_claims DESC;
 /*3.*/ 
 --    a. Which drug (generic_name) had the highest total drug cost?
 
+SELECT d.generic_name AS drug,
+	ROUND(total_drug_cost, 2) AS drug_cost
+FROM prescription AS p
+INNER JOIN drug AS d
+USING(drug_name)
+ORDER BY drug_cost DESC
+LIMIT 10;
+
+--Answer: PIRFENIDONE costs $2,829,174.30!
+
 --    b. Which drug (generic_name) has the hightest total cost per day? **Bonus: Round your cost per day column to 2 decimal places. Google ROUND to see how this works.**
 
 /*4.*/ 
