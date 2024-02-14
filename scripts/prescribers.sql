@@ -86,19 +86,87 @@ LIMIT 10;
 
 --Answer: PIRFENIDONE costs $2,829,174.30!
 
---    b. Which drug (generic_name) has the hightest total cost per day? **Bonus: Round your cost per day column to 2 decimal places. Google ROUND to see how this works.**
+--    b. Which drug (generic_name) has the hightest total cost per day? 
+
+SELECT d.generic_name AS drug,
+	ROUND(total_drug_cost/total_day_supply, 2) AS drug_cost_per_day
+FROM prescription AS p
+INNER JOIN drug AS d
+USING(drug_name)
+ORDER BY drug_cost_per_day DESC
+LIMIT 1;
+
+--Answer: IMMUN GLOB G(IGG)/GLY/IGA OV50
 
 /*4.*/ 
---    a. For each drug in the drug table, return the drug name and then a column named 'drug_type' which says 'opioid' for drugs which have opioid_drug_flag = 'Y', says 'antibiotic' for those drugs which have antibiotic_drug_flag = 'Y', and says 'neither' for all other drugs. **Hint:** You may want to use a CASE expression for this. See https://www.postgresqltutorial.com/postgresql-tutorial/postgresql-case/ 
+--    a. For each drug in the drug table, return the drug name and then a column named 'drug_type' which says 'opioid' for drugs which have opioid_drug_flag = 'Y', says 'antibiotic' for those drugs which have antibiotic_drug_flag = 'Y', and says 'neither' for all other drugs. 
+
+SELECT drug_name,
+	CASE WHEN opioid_drug_flag = 'Y' THEN 'opioid'
+	WHEN antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+	ELSE 'neither' END AS drug_type
+FROM drug;
 
 --    b. Building off of the query you wrote for part a, determine whether more was spent (total_drug_cost) on opioids or on antibiotics. Hint: Format the total costs as MONEY for easier comparision.
+
+SELECT CASE WHEN d.opioid_drug_flag = 'Y' THEN 'opioid'
+	WHEN d.antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+	ELSE 'neither' END AS drug_type,
+	SUM(p.total_drug_cost) AS sum_drug_cost
+FROM drug AS d
+INNER JOIN prescription AS p
+USING(drug_name)
+WHERE CASE WHEN d.opioid_drug_flag = 'Y' THEN 'opioid'
+	WHEN d.antibiotic_drug_flag = 'Y' THEN 'antibiotic'
+	ELSE 'neither' END <> 'neither'
+GROUP BY drug_type
+ORDER BY sum_drug_cost DESC;
+
+--More was spent on opioids
 
 /*5.*/ 
 --    a. How many CBSAs are in Tennessee? **Warning:** The cbsa table contains information for all states, not just Tennessee.
 
+SELECT COUNT(*)
+FROM cbsa
+WHERE cbsaname ILIKE '%, TN';
+
+--Answer: 33
+
 --    b. Which cbsa has the largest combined population? Which has the smallest? Report the CBSA name and total population.
+	
+(SELECT c.cbsaname AS city,
+        SUM(p.population) AS total_pop
+ FROM cbsa AS c
+ INNER JOIN population AS p
+ USING(fipscounty)
+ GROUP BY city
+ ORDER BY total_pop DESC
+ LIMIT 1)
+UNION
+(SELECT c.cbsaname AS city,
+        SUM(p.population) AS total_pop
+ FROM cbsa AS c
+ INNER JOIN population AS p
+ USING(fipscounty)
+ GROUP BY city
+ ORDER BY total_pop ASC
+ LIMIT 1);
+
+--Answer: Morristown, TN has the smallest population of 116,352; Nashville-Davidson--Murfreesboro--Franklin, TN has the largest population of 1,830,410.
 
 --    c. What is the largest (in terms of population) county which is not included in a CBSA? Report the county name and population.
+
+SELECT f.county,
+	p.population
+FROM fips_county AS f
+INNER JOIN population AS p
+USING(fipscounty)
+WHERE f.fipscounty NOT IN (SELECT fipscounty FROM cbsa)
+ORDER BY p.population DESC
+LIMIT 1;
+
+--Answer: Sevier, population 95,523
 
 /*6.*/ 
 --    a. Find all rows in the prescription table where total_claims is at least 3000. Report the drug_name and the total_claim_count.
