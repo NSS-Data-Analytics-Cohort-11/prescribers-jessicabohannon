@@ -10,7 +10,7 @@ ORDER BY total_claims DESC;
 
 --Answer: 1881634483
     
---    b. Repeat the above, but this time report the nppes_provider_first_name, nppes_provider_last_org_name,  specialty_description, and the total number of claims.
+--    b. Repeat the above, but this time report the nppes_provider_first_name, nppes_provider_last_org_name, specialty_description, and the total number of claims.
 
 SELECT dr.nppes_provider_first_name AS prescriber_first_name,
 	dr.nppes_provider_last_org_name AS prescriber_last_name,
@@ -71,7 +71,35 @@ ORDER BY total_claims DESC;
 
 --    d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
 
---Will come back to this later, but use case when similar to the % male/female names question I did recently
+WITH all_drugs AS (
+	SELECT dr.specialty_description AS specialty,
+		SUM(total_claim_count) AS total_claims
+	FROM prescriber AS dr
+	INNER JOIN prescription AS p
+	USING(npi)
+	INNER JOIN drug AS d
+	USING(drug_name)
+	GROUP BY specialty
+),
+opioids AS (
+	SELECT dr.specialty_description AS specialty,
+		SUM(total_claim_count) AS opioid_claims
+	FROM prescriber AS dr
+	INNER JOIN prescription AS p
+	USING(npi)
+	INNER JOIN drug AS d
+	USING(drug_name)
+	WHERE d.opioid_drug_flag = 'Y'
+	GROUP BY specialty
+)
+SELECT specialty,
+	ROUND(opioid_claims/total_claims * 100.00, 2) AS perc_opioids
+FROM all_drugs
+INNER JOIN opioids
+USING(specialty)
+ORDER BY perc_opioids DESC;
+
+--Answer: Case Manager, Orthopaedic Surgery, Interventional Pain Management, and Anesthesiology are the top 4.
 
 /*3.*/ 
 --    a. Which drug (generic_name) had the highest total drug cost?
@@ -98,7 +126,7 @@ USING(drug_name)
 ORDER BY drug_cost_per_day DESC
 LIMIT 1;
 
---Answer: IMMUN GLOB G(IGG)/GLY/IGA OV50
+--Answer: IMMUN GLOB G(IGG)/GLY/IGA OV50 costs $7,141.11 per day.
 
 /*4.*/ 
 --    a. For each drug in the drug table, return the drug name and then a column named 'drug_type' which says 'opioid' for drugs which have opioid_drug_flag = 'Y', says 'antibiotic' for those drugs which have antibiotic_drug_flag = 'Y', and says 'neither' for all other drugs. 
@@ -114,7 +142,7 @@ FROM drug;
 SELECT CASE WHEN d.opioid_drug_flag = 'Y' THEN 'opioid'
 	WHEN d.antibiotic_drug_flag = 'Y' THEN 'antibiotic'
 	ELSE 'neither' END AS drug_type,
-	SUM(p.total_drug_cost) AS sum_drug_cost
+	TO_CHAR(SUM(p.total_drug_cost), '$999,999,999.00') AS sum_drug_cost
 FROM drug AS d
 INNER JOIN prescription AS p
 USING(drug_name)
@@ -138,7 +166,7 @@ WHERE cbsaname ILIKE '%, TN';
 --    b. Which cbsa has the largest combined population? Which has the smallest? Report the CBSA name and total population.
 	
 (SELECT c.cbsaname AS city,
-        SUM(p.population) AS total_pop
+        TO_CHAR(SUM(p.population), '999,999,999') AS total_pop
  FROM cbsa AS c
  INNER JOIN population AS p
  USING(fipscounty)
@@ -147,7 +175,7 @@ WHERE cbsaname ILIKE '%, TN';
  LIMIT 1)
 UNION
 (SELECT c.cbsaname AS city,
-        SUM(p.population) AS total_pop
+        TO_CHAR(SUM(p.population), '999,999,999') AS total_pop
  FROM cbsa AS c
  INNER JOIN population AS p
  USING(fipscounty)
@@ -239,4 +267,5 @@ USING(drug_name)
 WHERE dr.specialty_description = 'Pain Management'
 	AND dr.nppes_provider_city = 'NASHVILLE'
 	AND opioid_drug_flag = 'Y'
-GROUP BY prescriber, drug_name;
+GROUP BY prescriber, drug_name
+ORDER BY num_claims DESC;
