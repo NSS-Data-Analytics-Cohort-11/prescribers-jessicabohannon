@@ -2,7 +2,7 @@
 --    a. Which prescriber had the highest total number of claims (totaled over all drugs)? Report the npi and the total number of claims.
 
 SELECT npi AS prescriber,
-	SUM(total_claim_count_ge65) AS total_claims
+	ROUND(SUM(total_claim_count_ge65), 0) AS total_claims
 FROM prescription
 GROUP BY npi
 HAVING SUM(total_claim_count_ge65) IS NOT NULL
@@ -15,7 +15,7 @@ ORDER BY total_claims DESC;
 SELECT dr.nppes_provider_first_name AS prescriber_first_name,
 	dr.nppes_provider_last_org_name AS prescriber_last_name,
 	dr.specialty_description AS specialty,
-	SUM(med.total_claim_count_ge65) AS total_claims
+	ROUND(SUM(med.total_claim_count_ge65), 0) AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
@@ -29,7 +29,7 @@ ORDER BY total_claims DESC;
 --    a. Which specialty had the most total number of claims (totaled over all drugs)?
 
 SELECT dr.specialty_description AS specialty,
-	SUM(med.total_claim_count_ge65) AS total_claims
+	TO_CHAR(SUM(med.total_claim_count_ge65), '999,999,999') AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
@@ -42,7 +42,7 @@ ORDER BY total_claims DESC;
 --    b. Which specialty had the most total number of claims for opioids?
 
 SELECT dr.specialty_description AS specialty,
-	SUM(med.total_claim_count_ge65) AS total_claims
+	TO_CHAR(SUM(med.total_claim_count_ge65), '999,999') AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
@@ -104,10 +104,8 @@ ORDER BY perc_opioids DESC;
 /*3.*/ 
 --    a. Which drug (generic_name) had the highest total drug cost?
 
------Robert said something about summing the total_cost?
-
 SELECT d.generic_name AS drug,
-	ROUND(total_drug_cost, 2) AS drug_cost
+	TO_CHAR(total_drug_cost, '$9,999,999.00') AS drug_cost
 FROM prescription AS p
 INNER JOIN drug AS d
 USING(drug_name)
@@ -119,7 +117,7 @@ LIMIT 10;
 --    b. Which drug (generic_name) has the hightest total cost per day? 
 
 SELECT d.generic_name AS drug,
-	ROUND(total_drug_cost/total_day_supply, 2) AS drug_cost_per_day
+	TO_CHAR(total_drug_cost/total_day_supply, '$9,999.99') AS drug_cost_per_day
 FROM prescription AS p
 INNER JOIN drug AS d
 USING(drug_name)
