@@ -76,6 +76,8 @@ ORDER BY total_claims DESC;
 /*3.*/ 
 --    a. Which drug (generic_name) had the highest total drug cost?
 
+-----Robert said something about summing the total_cost?
+
 SELECT d.generic_name AS drug,
 	ROUND(total_drug_cost, 2) AS drug_cost
 FROM prescription AS p
@@ -171,9 +173,33 @@ LIMIT 1;
 /*6.*/ 
 --    a. Find all rows in the prescription table where total_claims is at least 3000. Report the drug_name and the total_claim_count.
 
+SELECT drug_name,
+	total_claim_count
+FROM prescription AS p
+WHERE total_claim_count >= 3000;
+
 --    b. For each instance that you found in part a, add a column that indicates whether the drug is an opioid.
 
+SELECT p.drug_name,
+	p.total_claim_count,
+	d.opioid_drug_flag AS is_opioid
+FROM prescription AS p
+INNER JOIN drug AS d
+USING(drug_name)
+WHERE total_claim_count >= 3000;
+
 --    c. Add another column to you answer from the previous part which gives the prescriber first and last name associated with each row.
+
+SELECT p.drug_name,
+	p.total_claim_count,
+	d.opioid_drug_flag AS is_opioid,
+	CONCAT(dr.nppes_provider_first_name, ' ', dr.nppes_provider_last_org_name) AS prescriber
+FROM prescription AS p
+INNER JOIN drug AS d
+USING(drug_name)
+INNER JOIN prescriber AS dr
+USING(npi)
+WHERE total_claim_count >= 3000;
 
 /*7. The goal of this exercise is to generate a full list of all pain management specialists in Nashville and the number of claims they had for each opioid. **Hint:** The results from all 3 parts will have 637 rows.*/
 
