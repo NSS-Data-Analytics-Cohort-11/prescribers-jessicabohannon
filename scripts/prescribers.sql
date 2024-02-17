@@ -2,47 +2,50 @@
 --    a. Which prescriber had the highest total number of claims (totaled over all drugs)? Report the npi and the total number of claims.
 
 SELECT npi AS prescriber,
-	ROUND(SUM(total_claim_count_ge65), 0) AS total_claims
+	ROUND(SUM(total_claim_count), 0) AS total_claims
 FROM prescription
 GROUP BY npi
-HAVING SUM(total_claim_count_ge65) IS NOT NULL
-ORDER BY total_claims DESC;
+HAVING SUM(total_claim_count) IS NOT NULL
+ORDER BY total_claims DESC
+LIMIT 1;
 
---Answer: 1881634483
+--Answer: Prescriber 1881634483 had 99,707 claims
     
 --    b. Repeat the above, but this time report the nppes_provider_first_name, nppes_provider_last_org_name, specialty_description, and the total number of claims.
 
 SELECT dr.nppes_provider_first_name AS prescriber_first_name,
 	dr.nppes_provider_last_org_name AS prescriber_last_name,
 	dr.specialty_description AS specialty,
-	ROUND(SUM(med.total_claim_count_ge65), 0) AS total_claims
+	ROUND(SUM(med.total_claim_count), 0) AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
 GROUP BY prescriber_first_name, prescriber_last_name, specialty
-HAVING SUM(total_claim_count_ge65) IS NOT NULL
-ORDER BY total_claims DESC;
+HAVING SUM(total_claim_count) IS NOT NULL
+ORDER BY total_claims DESC
+LIMIT 1;
 
---Answer: Bruce Pendley, Family Practice, 70549 claims
+--Answer: Bruce Pendley, Family Practice, 99,707 claims
 
 /*2.*/ 
 --    a. Which specialty had the most total number of claims (totaled over all drugs)?
 
 SELECT dr.specialty_description AS specialty,
-	TO_CHAR(SUM(med.total_claim_count_ge65), '999,999,999') AS total_claims
+	TO_CHAR(SUM(med.total_claim_count), '999,999,999') AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
 GROUP BY specialty
-HAVING SUM(total_claim_count_ge65) IS NOT NULL
-ORDER BY total_claims DESC;
+HAVING SUM(total_claim_count) IS NOT NULL
+ORDER BY total_claims DESC
+LIMIT 1;
 
 --Answer: Family Practice
 
 --    b. Which specialty had the most total number of claims for opioids?
 
 SELECT dr.specialty_description AS specialty,
-	TO_CHAR(SUM(med.total_claim_count_ge65), '999,999') AS total_claims
+	TO_CHAR(SUM(med.total_claim_count), '999,999') AS total_claims
 FROM prescriber AS dr
 INNER JOIN prescription AS med
 USING(npi)
@@ -50,7 +53,7 @@ INNER JOIN drug AS d
 USING(drug_name)
 WHERE d.opioid_drug_flag = 'Y'
 GROUP BY specialty
-HAVING SUM(total_claim_count_ge65) IS NOT NULL
+HAVING SUM(total_claim_count) IS NOT NULL
 ORDER BY total_claims DESC;
 
 --Answer: Nurse Practitioner
@@ -58,16 +61,28 @@ ORDER BY total_claims DESC;
 --    c. **Challenge Question:** Are there any specialties that appear in the prescriber table that have no associated prescriptions in the prescription table?
 
 SELECT dr.specialty_description AS specialty,
-	SUM(med.total_claim_count_ge65) AS total_claims
+	SUM(med.total_claim_count) AS total_claims
 FROM prescriber AS dr
-INNER JOIN prescription AS med
+LEFT JOIN prescription AS med
 USING(npi)
 GROUP BY specialty
-HAVING SUM(total_claim_count_ge65) IS NULL
-	OR SUM(total_claim_count_ge65) = 0
+HAVING SUM(total_claim_count) IS NULL
+	OR SUM(total_claim_count) = 0
 ORDER BY total_claims DESC;
 
---Yes, three are NULL and 6 are 0, including Counselor and Psychologist
+--Or with an anti-join:
+
+SELECT DISTINCT specialty_description AS specialty
+FROM prescriber
+WHERE specialty_description NOT IN (
+	SELECT specialty_description
+	FROM prescriber
+	INNER JOIN prescription
+	USING(npi)
+)
+ORDER BY specialty;
+
+--Answer: Yes, 15
 
 --    d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
 
@@ -93,11 +108,29 @@ opioids AS (
 	GROUP BY specialty
 )
 SELECT specialty,
-	ROUND(opioid_claims/total_claims * 100.00, 2) AS perc_opioids
+	COALESCE(ROUND(opioid_claims/total_claims * 100.00, 2), 0) AS perc_opioids
 FROM all_drugs
-INNER JOIN opioids
+LEFT JOIN opioids
 USING(specialty)
 ORDER BY perc_opioids DESC;
+
+--Alternatively:
+
+SELECT specialty_description AS specialty,
+	SUM(CASE WHEN opioid_drug_flag = 'Y' THEN total_claim_count
+		ELSE 0
+		END) as opioid_claims,
+	SUM(total_claim_count) AS total_claims,
+	ROUND(SUM(CASE WHEN opioid_drug_flag = 'Y' THEN total_claim_count
+		ELSE 0
+		END) * 100.0 /  SUM(total_claim_count), 2) AS opioid_percentage
+FROM prescriber
+INNER JOIN prescription
+USING(npi)
+INNER JOIN drug
+USING(drug_name)
+GROUP BY specialty_description
+order by opioid_percentage DESC;
 
 --Answer: Case Manager, Orthopaedic Surgery, Interventional Pain Management, and Anesthesiology are the top 4.
 
@@ -105,26 +138,28 @@ ORDER BY perc_opioids DESC;
 --    a. Which drug (generic_name) had the highest total drug cost?
 
 SELECT d.generic_name AS drug,
-	TO_CHAR(total_drug_cost, '$9,999,999.00') AS drug_cost
+	SUM(total_drug_cost) AS drug_cost
 FROM prescription AS p
 INNER JOIN drug AS d
 USING(drug_name)
+GROUP BY drug
 ORDER BY drug_cost DESC
 LIMIT 10;
 
---Answer: PIRFENIDONE costs $2,829,174.30!
+--Answer: INSULIN GLARGINE,HUM.REC.ANLOG at $104,264,066.35
 
 --    b. Which drug (generic_name) has the hightest total cost per day? 
 
 SELECT d.generic_name AS drug,
-	TO_CHAR(total_drug_cost/total_day_supply, '$9,999.99') AS drug_cost_per_day
+	ROUND(SUM(total_drug_cost)/SUM(total_day_supply), 2) AS drug_cost_per_day
 FROM prescription AS p
 INNER JOIN drug AS d
 USING(drug_name)
+GROUP BY drug
 ORDER BY drug_cost_per_day DESC
 LIMIT 1;
 
---Answer: IMMUN GLOB G(IGG)/GLY/IGA OV50 costs $7,141.11 per day.
+--Answer: "C1 ESTERASE INHIBITOR" at $3,495.22 per day
 
 /*4.*/ 
 --    a. For each drug in the drug table, return the drug name and then a column named 'drug_type' which says 'opioid' for drugs which have opioid_drug_flag = 'Y', says 'antibiotic' for those drugs which have antibiotic_drug_flag = 'Y', and says 'neither' for all other drugs. 
@@ -140,7 +175,7 @@ FROM drug;
 SELECT CASE WHEN d.opioid_drug_flag = 'Y' THEN 'opioid'
 	WHEN d.antibiotic_drug_flag = 'Y' THEN 'antibiotic'
 	ELSE 'neither' END AS drug_type,
-	TO_CHAR(SUM(p.total_drug_cost), '$999,999,999.00') AS sum_drug_cost
+	SUM(p.total_drug_cost)::MONEY AS sum_drug_cost
 FROM drug AS d
 INNER JOIN prescription AS p
 USING(drug_name)
@@ -155,16 +190,18 @@ ORDER BY sum_drug_cost DESC;
 /*5.*/ 
 --    a. How many CBSAs are in Tennessee? **Warning:** The cbsa table contains information for all states, not just Tennessee.
 
-SELECT COUNT(*)
+SELECT COUNT(DISTINCT cbsa)
 FROM cbsa
-WHERE cbsaname ILIKE '%, TN';
+INNER JOIN fips_county
+USING(fipscounty)
+WHERE state = 'TN';
 
---Answer: 33
+--Answer: 10
 
 --    b. Which cbsa has the largest combined population? Which has the smallest? Report the CBSA name and total population.
 	
 (SELECT c.cbsaname AS city,
-        TO_CHAR(SUM(p.population), '999,999,999') AS total_pop
+        SUM(p.population) AS total_pop
  FROM cbsa AS c
  INNER JOIN population AS p
  USING(fipscounty)
@@ -173,7 +210,7 @@ WHERE cbsaname ILIKE '%, TN';
  LIMIT 1)
 UNION
 (SELECT c.cbsaname AS city,
-        TO_CHAR(SUM(p.population), '999,999,999') AS total_pop
+        SUM(p.population) AS total_pop
  FROM cbsa AS c
  INNER JOIN population AS p
  USING(fipscounty)
@@ -247,13 +284,14 @@ SELECT dr.npi AS prescriber,
 FROM prescriber AS dr
 CROSS JOIN drug AS d
 LEFT JOIN prescription AS p
-USING(drug_name)
+USING(npi, drug_name)
 WHERE dr.specialty_description = 'Pain Management'
 	AND dr.nppes_provider_city = 'NASHVILLE'
 	AND opioid_drug_flag = 'Y'
-GROUP BY prescriber, drug_name;
-    
---    c. Finally, if you have not done so already, fill in any missing values for total_claim_count with 0. Hint - Google the COALESCE function.
+GROUP BY prescriber, drug_name
+ORDER BY prescriber;
+
+--    c. Finally, if you have not done so already, fill in any missing values for total_claim_count with 0.
 
 SELECT dr.npi AS prescriber,
 	d.drug_name,
@@ -261,7 +299,7 @@ SELECT dr.npi AS prescriber,
 FROM prescriber AS dr
 CROSS JOIN drug AS d
 LEFT JOIN prescription AS p
-USING(drug_name)
+USING(npi, drug_name)
 WHERE dr.specialty_description = 'Pain Management'
 	AND dr.nppes_provider_city = 'NASHVILLE'
 	AND opioid_drug_flag = 'Y'
